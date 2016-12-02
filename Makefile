@@ -41,10 +41,11 @@ all: $(hex)
 	@echo Program it with: dd if=work/bbl.bin of=/dev/sd-your-card bs=1M
 	@echo
 
-$(toolchain_dest)/bin/$(target)-gcc: $(toolchain_srcdir)
-	mkdir -p $(toolchain_wrkdir)
-	cd $(toolchain_wrkdir); $(toolchain_srcdir)/configure --prefix=$(toolchain_dest)
-	$(MAKE) -C $(toolchain_wrkdir) linux
+$(toolchain_dest)/bin/$(target)-gcc:
+	export PATH=$PATH:$(CURDIR)/toolchain/bin
+	@mkdir -p $(toolchain_wrkdir)
+	@cd $(toolchain_wrkdir); $(toolchain_srcdir)/configure --prefix=$(toolchain_dest)
+	@$(MAKE) -C $(toolchain_wrkdir) linux
 
 $(buildroot_tar): $(buildroot_srcdir) $(RISCV)/bin/$(target)-gcc
 	$(MAKE) -C $< RISCV=$(RISCV) PATH=$(PATH) O=$(buildroot_wrkdir) riscv64_defconfig
@@ -56,7 +57,7 @@ buildroot-menuconfig: $(buildroot_srcdir)
 
 $(sysroot_stamp): $(buildroot_tar)
 	mkdir -p $(sysroot)
-	tar -xpf $< -C $(sysroot) --exclude ./dev --exclude ./usr/share/locale
+	tar -xpf $< -C $(sysroot) --exclude ./dev
 	touch $@
 
 $(linux_release):
@@ -64,9 +65,10 @@ $(linux_release):
 
 $(linux_wrkdir)/.config: $(linux_defconfig) $(linux_srcdir) $(linux_release)
 	mkdir -p $(dir $@)
-	cp -p $< $@
+	@cp -p $< $@
+	cp -p $< $(linux_srcdir)/arch/riscv/configs/sifive_defconfig
 	cd $(linux_srcdir); tar --strip-components=1 -xJf ../$(linux_release); git checkout .gitignore arch/.gitignore
-	$(MAKE) -C $(linux_srcdir) O=$(linux_wrkdir) ARCH=riscv olddefconfig
+	$(MAKE) -C $(linux_srcdir) O=$(linux_wrkdir) ARCH=riscv sifive_defconfig menuconfig
 
 $(vmlinux): $(linux_srcdir) $(linux_wrkdir)/.config $(sysroot_stamp)
 	$(MAKE) -C $< O=$(linux_wrkdir) \
@@ -104,4 +106,5 @@ bbl: $(bbl)
 
 .PHONY: clean
 clean:
-	rm -rf -- $(wrkdir) $(toolchain_dest)
+	@rm -rf -- $(wrkdir) $(toolchain_dest)
+	rm -rf -- $(wrkdir)
